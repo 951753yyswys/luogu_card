@@ -12,10 +12,7 @@ const {
  * @returns {Object} 获取的用户数据 {name, color, ccfLevel, passed, hideInfo}
  */
 async function fetchStats(id) {
-    //debug 测试请求
-    //const res = await axios.get(`https://tc-0glpuj1k4e75e5ec-1300876583.ap-shanghai.service.tcloudbase.com/luogu?id=${id}`);
-
-    const res = await axios.get(`https://www.luogu.com.cn/user/${id}?_contentOnly`)
+    const res = await axios.get(`https://www.luogu.com.cn/user/${id}?_contentOnly`);
 
     const stats = {
         name: "NULL",
@@ -23,29 +20,51 @@ async function fetchStats(id) {
         ccfLevel: 0,
         passed: [0,0,0,0,0,0,0,0],
         unpassed: 0,
-        hideInfo: false
+        hideInfo: false,
+        tag: ""
     }
+    
     if(res.data.code !== 200) {
         return stats;
     }
 
     const user = res.data.currentData.user;
-    const passed = res.data.currentData.passedProblems;
+    const passedProblems = res.data.currentData.passedProblems || [];
+    const submittedProblems = res.data.currentData.submittedProblems || [];
 
-    if(!passed) {
+    // 处理用户名解码
+    try {
+        stats.name = user.name ? decodeURI(user.name) : "Luogu User";
+    } catch (e) {
+        stats.name = user.name || "Luogu User";
+    }
+    
+    // 处理徽章解码
+    try {
+        stats.tag = user.badge ? decodeURI(user.badge) : "";
+    } catch (e) {
+        stats.tag = user.badge || "";
+    }
+
+    stats.color = user.color || "Gray";
+    stats.ccfLevel = user.ccfLevel || 0;
+    
+    if(!passedProblems || passedProblems.length === 0) {
         stats.hideInfo = true;
         return stats;
     }
 
-    stats.name = decodeURI(user.name);
-    stats.color = user.color;
-    stats.ccfLevel = user.ccfLevel;
-    stats.tag = decodeURI(user.badge);
-    stats.unpassed = res.data.currentData.submittedProblems.length;
-
-    for(let i of passed) {
-        stats.passed[i.difficulty]++;
+    // 计算各难度通过数量
+    for(let problem of passedProblems) {
+        const difficulty = problem.difficulty;
+        if (difficulty >= 0 && difficulty <= 7) {
+            stats.passed[difficulty]++;
+        }
     }
+
+    // 计算未通过题目数（总提交数 - 通过数）
+    stats.unpassed = submittedProblems.length - passedProblems.length;
+    if (stats.unpassed < 0) stats.unpassed = 0;
 
     return stats;
 } 
@@ -68,12 +87,12 @@ const renderSVG = (stats, options) => {
     } = options || {};
 
     if(hideInfo) {
-        return renderError("用户开启了“完全隐私保护”，获取数据失败", options={width:360});
+        return renderError("用户开启了「完全隐私保护」，获取数据失败", {width: 360});
     }
     
     const paddingX = 25;
-    const labelWidth = 90;    //柱状图头部文字长度
-    const progressWidth = cardWidth - 2*paddingX - labelWidth - 60; //500 - 25*2(padding) - 90(头部文字长度) - 60(预留尾部文字长度)，暂时固定，后序提供自定义选项;
+    const labelWidth = 90;
+    const progressWidth = cardWidth - 2*paddingX - labelWidth - 60;
 
     const datas = [
         {label: "未评定", color:"#bfbfbf", data: passed[0]},
@@ -84,12 +103,14 @@ const renderSVG = (stats, options) => {
         {label: "提高+/省选-", color:"#3498db", data: passed[5]},
         {label: "省选/NOI-", color:"#9d3dcf", data: passed[6]},
         {label: "NOI/NOI+/CTSC", color:"#0e1d69", data: passed[7]},
-        {label: "心有余而力不足", color:"#0101DF", data: unpassed}
+        {label: "尝试过的题目", color:"#0101DF", data: unpassed}
     ]
-    const passedSum = passed.reduce((a, b) => a + b);
+    
+    // 计算总通过题目数
+    const passedSum = passed.reduce((a, b) => a + b, 0);
     const body = renderChart(datas, labelWidth, progressWidth, "题");
 
-    const title = renderNameTitle(name, color, ccfLevel, "的练习情况", cardWidth, `已通过: ${passedSum}题`,tag);
+    const title = renderNameTitle(name, color, ccfLevel, "的练习情况", cardWidth, `已通过: ${passedSum}题`, tag);
 
     return new Card({
         width: cardWidth - 2*paddingX,
