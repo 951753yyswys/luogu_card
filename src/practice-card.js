@@ -67,8 +67,8 @@ async function fetchStats(id) {
         }
     }
 
-    // 计算未通过题目数（总提交数 - 通过数）
-    stats.unpassed = submittedProblems.length - passedProblems.length;
+    // 计算未通过题目数（总提交数 - 通过数） - passedProblems.length
+    stats.unpassed = submittedProblems.length;
     if (stats.unpassed < 0) stats.unpassed = 0;
 
     return stats;
