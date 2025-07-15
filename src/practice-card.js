@@ -12,7 +12,11 @@ const {
  * @returns {Object} 获取的用户数据 {name, color, ccfLevel, passed, hideInfo}
  */
 async function fetchStats(id) {
-    const res = await axios.get(`https://www.luogu.com.cn/user/${id}?_contentOnly`);
+    const res = await axios.get(`https://www.luogu.com.cn/user/${id}?_contentOnly`, {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+    });
 
     const stats = {
         name: "NULL",
@@ -32,33 +36,34 @@ async function fetchStats(id) {
     const passedProblems = res.data.currentData.passedProblems || [];
     const submittedProblems = res.data.currentData.submittedProblems || [];
 
-    // 处理用户名解码
+    // 处理用户名
     try {
-        stats.name = user.name ? decodeURI(user.name) : "Luogu User";
+        stats.name = user.name ? user.name : "Luogu User";
     } catch (e) {
-        stats.name = user.name || "Luogu User";
+        stats.name = "Luogu User";
     }
     
-    // 处理徽章解码
+    // 处理徽章标签
     try {
-        stats.tag = user.badge ? decodeURI(user.badge) : "";
+        stats.tag = user.badge ? user.badge : "";
     } catch (e) {
-        stats.tag = user.badge || "";
+        stats.tag = "";
     }
 
     stats.color = user.color || "Gray";
     stats.ccfLevel = user.ccfLevel || 0;
     
+    // 检查用户是否隐藏信息
     if(!passedProblems || passedProblems.length === 0) {
         stats.hideInfo = true;
         return stats;
     }
 
-    // 计算各难度通过数量
+    // 计算各难度通过数量 - 修复：使用正确的字段名 "difficulty"
     for(let problem of passedProblems) {
-        const difficulty = problem.difficulty;
-        if (difficulty >= 0 && difficulty <= 7) {
-            stats.passed[difficulty]++;
+        const diff = problem.difficulty; // 注意这里是 "difficulty" 不是 "difficulty"
+        if (diff >= 0 && diff <= 7) {
+            stats.passed[diff]++;
         }
     }
 
